@@ -94,7 +94,7 @@ function initDT() {
           colNM[1] === 'pushed_at'
             ? (data, type, _row) => {
                 if (type === 'display') {
-                  return moment(data).fromNow();
+                  return moment(data).format('YYYY-MM-DD');
                 }
                 return data;
               }
