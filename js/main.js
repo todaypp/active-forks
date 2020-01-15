@@ -110,12 +110,21 @@ async function fetchAndShow(repo) {
   repo = repo.replace('http://github.com/', '');
   repo = repo.replace('.git', '');
 
+  const token = document.getElementById('token').value;
+  const config = token
+    ? {
+      headers: {
+        authorization: "token " + token
+      }
+    }
+    : undefined;
+
   try {
-    const response = await fetch(`https://api.github.com/repos/${repo}/forks?sort=stargazers&per_page=100`);
+    const response = await fetch(`https://api.github.com/repos/${repo}/forks?sort=stargazers&per_page=100`, config);
     if (!response.ok) throw Error(response.statusText);
     const data = await response.json();
 
-    await updateData(repo, data);
+    await updateData(repo, data, config);
 
     console.log(data);
     updateDT(data);
@@ -154,7 +163,7 @@ function getRepoFromUrl() {
   return urlRepo && decodeURIComponent(urlRepo);
 }
 
-async function updateData(repo, forks) {
+async function updateData(repo, forks, config) {
   const originalBranch = 'master'; // TODO
 
   let index = 1;
@@ -162,7 +171,7 @@ async function updateData(repo, forks) {
   progr.show();
   for (let fork of forks) {
     progr.update(index);
-    const res = await fetchMore(repo, originalBranch, fork);
+    const res = await fetchMore(repo, originalBranch, fork, config);
     if (!res)
       break;
     ++index;
@@ -170,22 +179,22 @@ async function updateData(repo, forks) {
   progr.hide();
 }
 
-async function fetchMore(repo, originalBranch, fork) {
+async function fetchMore(repo, originalBranch, fork, config) {
   const promises  = Promise.all([
-    fetchMoreDir(repo, originalBranch, fork, true),
-    fetchMoreDir(repo, originalBranch, fork, false)
+    fetchMoreDir(repo, originalBranch, fork, true, config),
+    fetchMoreDir(repo, originalBranch, fork, false, config)
   ]);
   const res = await promises;
   return res[0] && res[1];
 }
 
-async function fetchMoreDir(repo, originalBranch, fork, fromOriginal) {
+async function fetchMoreDir(repo, originalBranch, fork, fromOriginal, config) {
   const url = fromOriginal
     ? `https://api.github.com/repos/${repo}/compare/${fork.owner.login}:${fork.default_branch}...${originalBranch}`
     : `https://api.github.com/repos/${repo}/compare/${originalBranch}...${fork.owner.login}:${fork.default_branch}`;
 
   try {
-    const response = await fetch(url);
+    const response = await fetch(url, config);
     if (!response.ok) throw Error(response.statusText);
     const data = await response.json();
 
