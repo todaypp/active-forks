@@ -6,6 +6,12 @@ window.addEventListener('load', () => {
   const repo = getRepoFromUrl();
 
   // const repo = getRepoFromUrl();
+  try {
+    const token = localStorage.getItem('token');
+    if (token)
+      document.getElementById('token').value = token;
+  } catch {}
+
   if (repo) {
     document.getElementById('q').value = repo;
     fetchData();
@@ -111,6 +117,7 @@ async function fetchAndShow(repo) {
   repo = repo.replace('.git', '');
 
   const token = document.getElementById('token').value;
+  localStorage.setItem('token', token);
   const api = Api(token);
 
   let data;
