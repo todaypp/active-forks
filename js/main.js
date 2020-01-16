@@ -115,7 +115,20 @@ async function fetchAndShow(repo) {
 
   let data;
   try {
-    data = await api.fetch(`https://api.github.com/repos/${repo}/forks?sort=stargazers&per_page=100`);
+    const limiter = data => data.map(fork => ({
+      full_name: fork.full_name,
+      name: fork.name,
+      default_branch: fork.default_branch,
+      stargazers_count: fork.stargazers_count,
+      forks: fork.forks,
+      open_issues_count: fork.open_issues_count,
+      size: fork.size,
+      pushed_at: fork.pushed_at,
+      owner: {
+        login: fork.owner.login
+      }
+    }));
+    data = await api.fetch(`https://api.github.com/repos/${repo}/forks?sort=stargazers&per_page=100`, limiter);
 
     await updateData(repo, data, api);
   } catch (error) {
@@ -191,7 +204,22 @@ async function fetchMoreDir(repo, originalBranch, fork, fromOriginal, api) {
     ? `https://api.github.com/repos/${repo}/compare/${fork.owner.login}:${fork.default_branch}...${originalBranch}`
     : `https://api.github.com/repos/${repo}/compare/${originalBranch}...${fork.owner.login}:${fork.default_branch}`;
 
-  const data = await api.fetch(url);
+  const limiter = data => ({
+    commits: data.commits.map(c => ({
+      sha: c.sha.substr(0, 6),
+      commit: {
+        author: {
+          date: c.commit.author.date,
+          name: c.commit.author.name
+        },
+        message: c.commit.message
+      },
+      author: {
+        login: c.author ? c.author.login : undefined
+      }
+    }))
+  });
+  const data = await api.fetch(url, limiter);
 
   if (fromOriginal)
     fork.diff_from_original = printInfo('-', data);
@@ -206,7 +234,7 @@ function printInfo(sep, data) {
     data.commits
       .map(c => {
         c.author_date = c.commit.author.date.replace('Z', '').replace('T', ' ');
-        c.author_login = c.author ? c.author.login : '-';
+        c.author_login = c.author && c.author.login ? c.author.login : '-';
         return c;
        })
       .map(c => `${c.sha.substr(0, 6)} ${c.author_date} ${c.author_login} (${c.commit.author.name}) - ${c.commit.message}`)
@@ -283,13 +311,14 @@ function Api(token) {
       updateRate(response);
 
       const data = await response.json();
+      const limitedData = fnResponseLimiter(data);
 
       localStorage.setItem(key, JSON.stringify({
         etag: response.headers.get('etag'),
-        data
+        data: limitedData
       }));
 
-      return data;
+      return limitedData;
 
     } catch (error) {
       const msg =
