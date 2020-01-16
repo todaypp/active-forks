@@ -111,31 +111,22 @@ async function fetchAndShow(repo) {
   repo = repo.replace('.git', '');
 
   const token = document.getElementById('token').value;
-  const config = token
-    ? {
-      headers: {
-        authorization: "token " + token
-      }
-    }
-    : undefined;
+  const api = Api(token);
+
+  let data;
+  try {
+    data = await api.fetch(`https://api.github.com/repos/${repo}/forks?sort=stargazers&per_page=100`);
+
+    await updateData(repo, data, api);
+  } catch (error) {
+    console.error(error);
+  }
 
   try {
-    const response = await fetch(`https://api.github.com/repos/${repo}/forks?sort=stargazers&per_page=100`, config);
-    if (!response.ok) throw Error(response.statusText);
-    const data = await response.json();
-
-    await updateData(repo, data, config);
-
-    console.log(data);
     updateDT(data);
   } catch (error) {
-    const msg =
-      error.toString().indexOf('Forbidden') >= 0
-        ? 'Error: API Rate Limit Exceeded'
-        : error;
-    showMsg(`${msg}. Additional info in console`, 'danger');
     console.error(error);
-  };
+  }
 }
 
 function showMsg(msg, type) {
@@ -163,56 +154,43 @@ function getRepoFromUrl() {
   return urlRepo && decodeURIComponent(urlRepo);
 }
 
-async function updateData(repo, forks, config) {
+async function updateData(repo, forks, api) {
   const originalBranch = 'master'; // TODO
+
+  forks.forEach(fork => fork.diff_from_original = fork.diff_to_original = '');
 
   let index = 1;
   const progr = progress(forks.length);
   progr.show();
-  for (let fork of forks) {
-    progr.update(index);
-    const res = await fetchMore(repo, originalBranch, fork, config);
-    if (!res)
-      break;
-    ++index;
+  try {
+    for (let fork of forks) {
+      progr.update(index);
+      await fetchMore(repo, originalBranch, fork, api);
+      ++index;
+    }
+  } finally {
+    progr.hide();
   }
-  progr.hide();
 }
 
-async function fetchMore(repo, originalBranch, fork, config) {
-  const promises  = Promise.all([
-    fetchMoreDir(repo, originalBranch, fork, true, config),
-    fetchMoreDir(repo, originalBranch, fork, false, config)
+async function fetchMore(repo, originalBranch, fork, api) {
+  return Promise.all([
+    fetchMoreDir(repo, originalBranch, fork, true, api),
+    fetchMoreDir(repo, originalBranch, fork, false, api)
   ]);
-  const res = await promises;
-  return res[0] && res[1];
 }
 
-async function fetchMoreDir(repo, originalBranch, fork, fromOriginal, config) {
+async function fetchMoreDir(repo, originalBranch, fork, fromOriginal, api) {
   const url = fromOriginal
     ? `https://api.github.com/repos/${repo}/compare/${fork.owner.login}:${fork.default_branch}...${originalBranch}`
     : `https://api.github.com/repos/${repo}/compare/${originalBranch}...${fork.owner.login}:${fork.default_branch}`;
 
-  try {
-    const response = await fetch(url, config);
-    if (!response.ok) throw Error(response.statusText);
-    const data = await response.json();
+  const data = await api.fetch(url);
 
-    if (fromOriginal)
-      fork.diff_from_original = printInfo('-', data);
-    else
-      fork.diff_to_original = printInfo('+', data);
-
-    return true;
-  } catch (error) {
-    const msg =
-      error.toString().indexOf('Forbidden') >= 0
-        ? 'Error: API Rate Limit Exceeded'
-        : error;
-    showMsg(`${msg}. Additional info in console`, 'danger');
-    console.error(error);
-    return false;
-  }
+  if (fromOriginal)
+    fork.diff_from_original = printInfo('-', data);
+  else
+    fork.diff_to_original = printInfo('+', data);
 }
 
 function printInfo(sep, data) {
@@ -252,4 +230,48 @@ function progress(max) {
   }
 
   return { show, hide, update };
+}
+
+function Api(token) {
+  const config = token
+    ? {
+      headers: {
+        authorization: "token " + token
+      }
+    }
+    : undefined;
+
+  const rate = {
+    remaining: null,
+    limit: null,
+    reset: null
+  };
+
+  async function get(url) {
+    try {
+      const response = await fetch(url, config);
+      if (!response.ok)
+        throw Error(response.statusText);
+
+      rate.limit = response.headers.get('x-ratelimit-limit');
+      rate.remaining = response.headers.get('x-ratelimit-remaining');
+      rate.reset = new Date(1000 * parseInt(response.headers.get('x-ratelimit-reset')));
+
+      const data = await response.json();
+      return data;
+
+    } catch (error) {
+      const msg =
+        error.toString().indexOf('Forbidden') >= 0
+          ? 'Error: API Rate Limit Exceeded'
+          : error;
+      showMsg(`${msg}. Additional info in console`, 'danger');
+
+      throw new Error(error);
+    }
+  }
+
+  function getLimits() { return rate; }
+
+  return { fetch: get, getLimits };
 }
