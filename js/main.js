@@ -307,7 +307,8 @@ function printInfo(sep, data, fork) {
 }
 
 function Progress(max) {
-  const $progress = $('.progress-bar');
+  const $progress = $('.progress');
+  const $bar = $('.progress-bar');
 
   function show() { $progress.show(); }
 
@@ -315,8 +316,8 @@ function Progress(max) {
 
   function update(count) {
     const val = Math.round((count / max) * 100) + '%';
-    $progress.width(val);
-    $progress.text(`${count} / ${max}`);
+    $bar.width(val);
+    $bar.text(`${count} / ${max}`);
   }
 
   return { show, hide, update };
