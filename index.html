@@ -28,6 +28,16 @@
         .quota {
             font-size: 13px;
         }
+        .options-button:after {
+            font-family: "FontAwesome";
+            content: "\f105";
+            float: right;
+            margin-left: 5px;
+            width: 8px;
+        }
+        .options-button.options-button--expanded:after {
+            content: "\f107";
+        }
     </style>
 </head>
 
@@ -65,9 +75,31 @@
                                       <a href="https://help.github.com/en/github/authenticating-to-github/creating-a-personal-access-token-for-the-command-line" class="btn btn-success" target="_blank">
                                           Info
                                       </a>
+                                      <a class="btn btn-primary options-button" data-toggle="collapse" href="#options" role="button" aria-expanded="false" aria-controls="options">
+                                          Options
+                                      </a>
                                   </span>
                                   <span class="quota ml-3">
                                   </span>
+                              </div>
+
+                              <div class="options collapse mt-2 px-3" id="options">
+                                <div class="card bg-light card-body">
+                                  <div class="form-inline">
+
+                                    <label for="maxRecords">Max records:</label>
+                                    <input id="maxRecords" name="maxRecords" class="form-control ml-3 mr-5" type="number" min="10">
+
+                                    <label>Assume same commits if:</label>
+
+                                    <input id="sameSize" name="sameSize" class="form-check-input ml-3" type="checkbox">
+                                    <label for="sameSize" class="form-check-label">Same Size</label>
+
+                                    <input id="samePushDate" name="samePushDate" class="form-check-input ml-3" type="checkbox">
+                                    <label for="samePushDate" class="form-check-label">Same Push Date</label>
+
+                                  </div>
+                                </div>
                               </div>
 
                               <div class="progress mt-2">

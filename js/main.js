@@ -1,11 +1,12 @@
 window.addEventListener('load', () => {
   initDT(); // Initialize the DatatTable and window.columnNames variables
 
+  Options.loadAndShow();
+
   Progress().hide();
 
   const repo = getRepoFromUrl();
 
-  // const repo = getRepoFromUrl();
   try {
     const token = localStorage.getItem('token');
     if (token)
@@ -198,11 +199,20 @@ async function updateData(repo, forks, api) {
   const progress = Progress(forks.length);
   progress.show();
 
+  const options = Options.getAndSave();
+  const similarChecker = SimilarChecker(options);
+
   try {
     for (let fork of forks) {
       progress.update(index);
       if (!running) break;
-      await fetchMore(repo, originalBranch, fork, api);
+
+      const updated = similarChecker.apply(fork);
+
+      if (!updated) {
+        await fetchMore(repo, originalBranch, fork, api);
+        similarChecker.cache(fork);
+      }
       quota.update();
       ++index;
     }
@@ -420,4 +430,69 @@ const Runner = {
     $('#find .find-label').text('Find');
     $('#find #spinner').removeClass('d-inline-block');
   }
+};
+
+const Options = {
+
+  loadAndShow: function() {
+    $('#options')
+      .on('show.bs.collapse', () => $('.options-button').addClass('options-button--expanded'))
+      .on('hide.bs.collapse', () => $('.options-button').removeClass('options-button--expanded'));
+
+    try {
+      const savedString = localStorage.getItem('options');
+      if (!savedString) return;
+      const saved = JSON.parse(savedString);
+
+      $('#sameSize').attr('checked', saved.sameSize);
+      $('#samePushDate').attr('checked', saved.samePushDate);
+    } catch {}
+  },
+
+  getAndSave: function() {
+    const sameSize = $('#sameSize').is(':checked');
+    const samePushDate = $('#samePushDate').is(':checked');
+
+    try {
+      localStorage.setItem('options', JSON.stringify({ sameSize, samePushDate }));
+    } catch {}
+    return { sameSize, samePushDate };
+  }
+};
+
+function SimilarChecker(options) {
+  const similarForks = new Map();
+
+  function getKey(fork) {
+    let key = '';
+    if (options.sameSize) key += fork.size + '_';
+    if (options.samePushDate) key += fork.pushed_at + '_';
+    return key;
+  }
+
+  function apply(fork) {
+    const key = getKey(fork);
+    if (key.length > 0) {
+      const similarFork = similarForks.get(key);
+      if (similarFork) {
+        fork.diff_from_original = similarFork.diff_from_original;
+        fork.diff_to_original = similarFork.diff_to_original;
+        return true;
+      }
+    }
+
+    return false;
+  }
+
+  function cache(fork) {
+    const key = getKey(fork);
+    if (key.length > 0) {
+      similarForks.set(key, {
+        diff_from_original: fork.diff_from_original,
+        diff_to_original: fork.diff_to_original
+      });
+    }
+  }
+
+  return { apply, cache };
 }
