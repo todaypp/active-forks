@@ -173,6 +173,9 @@ async function updateData(repo, forks, api) {
     }
   } finally {
     progress.hide();
+
+    await api.refreshLimits();
+    quota.update();
   }
 }
 
@@ -257,22 +260,35 @@ function Api(token) {
     : undefined;
 
   const rate = {
-    remaining: null,
-    limit: null,
-    reset: null
+    remaining: '?',
+    limit: '?',
+    reset: new Date()
   };
 
   async function get(url) {
+    const key = url.toLowerCase();
     try {
-      const response = await fetch(url, config);
+      const config1 = JSON.parse(JSON.stringify(config));
+      const cachedString = localStorage.getItem(key);
+      const cached = JSON.parse(cachedString);
+      if (cached)
+        config1.headers['if-none-match'] = cached.etag;
+
+      const response = await fetch(url, config1);
+      if (response.status === 304)
+        return cached.data;
       if (!response.ok)
         throw Error(response.statusText);
 
-      rate.limit = response.headers.get('x-ratelimit-limit');
-      rate.remaining = response.headers.get('x-ratelimit-remaining');
-      rate.reset = new Date(1000 * parseInt(response.headers.get('x-ratelimit-reset')));
+      updateRate(response);
 
       const data = await response.json();
+
+      localStorage.setItem(key, JSON.stringify({
+        etag: response.headers.get('etag'),
+        data
+      }));
+
       return data;
 
     } catch (error) {
@@ -288,5 +304,18 @@ function Api(token) {
 
   function getLimits() { return rate; }
 
-  return { fetch: get, getLimits };
+  async function refreshLimits() {
+    const url = 'https://api.github.com/rate_limit';
+    const response = await fetch(url, config);
+    if (response.ok)
+      updateRate(response);
+  }
+
+  function updateRate(response) {
+    rate.limit = response.headers.get('x-ratelimit-limit');
+    rate.remaining = response.headers.get('x-ratelimit-remaining');
+    rate.reset = new Date(1000 * parseInt(response.headers.get('x-ratelimit-reset')));
+  }
+
+  return { fetch: get, getLimits, refreshLimits };
 }
