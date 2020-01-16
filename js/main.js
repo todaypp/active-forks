@@ -75,8 +75,6 @@ function updateDT(data) {
     .clear()
     .rows.add(dataSet)
     .draw();
-
-  $("[data-toggle=popover]").popover();
 }
 
 function initDT() {
@@ -123,6 +121,9 @@ function initDT() {
       { className: 'dt-right', targets: [4, 5, 6, 7, 9, 10] }
     ],
     order: [[sortColumnIdx, 'desc']],
+    createdRow: function(row) {
+      $('[data-toggle=popover]', row).popover();
+    }
   });
 }
 
@@ -272,6 +273,8 @@ async function fetchMoreDir(repo, originalBranch, fork, fromOriginal, api) {
 
 function printInfo(sep, data) {
   const length = data.commits.length;
+  if (length === 0)
+    return '0';
 
   const details = '<pre>' +
     data.commits
@@ -290,7 +293,7 @@ function printInfo(sep, data) {
       .replace(/>/g, '&gt;') +
     '</pre>';
 
-  return `<a tabindex="0" class="btn btn-sm" data-toggle="popover" data-trigger="focus" data-html="true" data-placement="bottom" title="Commits" data-content="${details}">${sep}${length}</a>`;
+  return `<a tabindex="0" class="btn btn-sm btn-outline-secondary" data-toggle="popover" data-trigger="focus" data-html="true" data-placement="bottom" title="Commits" data-content="${details}">${sep}${length}</a>`;
 }
 
 function Progress(max) {
