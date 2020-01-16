@@ -1,7 +1,7 @@
 window.addEventListener('load', () => {
   initDT(); // Initialize the DatatTable and window.columnNames variables
 
-  progress().hide();
+  Progress().hide();
 
   const repo = getRepoFromUrl();
 
@@ -160,16 +160,16 @@ async function updateData(repo, forks, api) {
   forks.forEach(fork => fork.diff_from_original = fork.diff_to_original = '');
 
   let index = 1;
-  const progr = progress(forks.length);
-  progr.show();
+  const progress = Progress(forks.length);
+  progress.show();
   try {
     for (let fork of forks) {
-      progr.update(index);
+      progress.update(index);
       await fetchMore(repo, originalBranch, fork, api);
       ++index;
     }
   } finally {
-    progr.hide();
+    progress.hide();
   }
 }
 
@@ -216,7 +216,7 @@ function printInfo(sep, data) {
   return `<a tabindex="0" class="btn btn-sm" data-toggle="popover" data-trigger="focus" data-html="true" data-placement="bottom" title="Commits" data-content="${details}">${sep}${length}</a>`;
 }
 
-function progress(max) {
+function Progress(max) {
   const $progress = $('.progress-bar');
 
   function show() { $progress.show(); }
