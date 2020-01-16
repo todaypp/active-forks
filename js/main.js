@@ -253,8 +253,7 @@ async function fetchMoreDir(repo, originalBranch, fork, fromOriginal, api) {
       sha: c.sha.substr(0, 6),
       commit: {
         author: {
-          date: c.commit.author.date,
-          name: c.commit.author.name
+          date: c.commit.author.date
         },
         message: c.commit.message
       },
@@ -266,12 +265,12 @@ async function fetchMoreDir(repo, originalBranch, fork, fromOriginal, api) {
   const data = await api.fetch(url, limiter);
 
   if (fromOriginal)
-    fork.diff_from_original = printInfo('-', data);
+    fork.diff_from_original = printInfo('-', data, fork);
   else
-    fork.diff_to_original = printInfo('+', data);
+    fork.diff_to_original = printInfo('+', data, fork);
 }
 
-function printInfo(sep, data) {
+function printInfo(sep, data, fork) {
   const length = data.commits.length;
   if (length === 0)
     return '0';
@@ -281,9 +280,11 @@ function printInfo(sep, data) {
       .map(c => {
         c.author_date = c.commit.author.date.replace('Z', '').replace('T', ' ');
         c.author_login = c.author && c.author.login ? c.author.login : '-';
+        const sha = c.sha.substr(0, 6);
+        c.link = `<a href="https://github.com/${fork.owner.login}/${fork.name}/commit/${sha}">${sha}</a>`
         return c;
        })
-      .map(c => `${c.sha.substr(0, 6)} ${c.author_date} ${c.author_login} (${c.commit.author.name}) - ${c.commit.message}`)
+      .map(c => `${c.link} ${c.author_date.substr(0, 10)} ${c.author_login} - ${c.commit.message}`)
       .map(s => s.replace(/[\n\r]/g, ' ').substr(0, 150))
       .join('\n')
       .replace(/&/g, '&amp;')
