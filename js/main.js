@@ -160,12 +160,15 @@ async function updateData(repo, forks, api) {
   forks.forEach(fork => fork.diff_from_original = fork.diff_to_original = '');
 
   let index = 1;
+  const quota = Quota(api);
   const progress = Progress(forks.length);
   progress.show();
+
   try {
     for (let fork of forks) {
       progress.update(index);
       await fetchMore(repo, originalBranch, fork, api);
+      quota.update();
       ++index;
     }
   } finally {
@@ -230,6 +233,18 @@ function Progress(max) {
   }
 
   return { show, hide, update };
+}
+
+function Quota(api) {
+  const $quota = $('.quota');
+
+  function update() {
+    const rate = api.getLimits();
+    const reset = moment(rate.reset).fromNow();
+    $quota.html(`Quota: left ${rate.remaining} / ${rate.limit}<br/>Reset ${reset}`);
+  }
+
+  return { update };
 }
 
 function Api(token) {
