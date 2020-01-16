@@ -106,15 +106,24 @@ function initDT() {
     columns: window.columnNamesMap.map(colNM => {
       return {
         title: colNM[0],
-        render:
-          colNM[1] === 'pushed_at'
-            ? (data, type, _row) => {
-                if (type === 'display') {
-                  return moment(data).format('YYYY-MM-DD');
-                }
-                return data;
-              }
-            : null,
+        render: (data, type, _row) => {
+          switch (colNM[1]) {
+
+            case 'pushed_at':
+              return type === 'display'
+                ? moment(data).format('YYYY-MM-DD')
+                : data;
+
+            case 'diff_from_original':
+            case 'diff_to_original':
+              return type === 'display'
+                ? data
+                : data.substr(4, 4);
+
+            default:
+              return data;
+          }
+        }
       };
     }),
     columnDefs: [
@@ -303,7 +312,8 @@ function printInfo(sep, data, fork) {
       .replace(/>/g, '&gt;') +
     '</pre>';
 
-  return `<a tabindex="0" class="btn btn-sm btn-outline-secondary" data-toggle="popover" data-trigger="focus" data-html="true" data-placement="bottom" title="Commits" data-content="${details}">${sep}${length}</a>`;
+  const sort = `<!--${('000' + length).substr(-4)}-->`;
+  return `${sort}<a tabindex="0" class="btn btn-sm btn-outline-secondary" data-toggle="popover" data-trigger="focus" data-html="true" data-placement="bottom" title="Commits" data-content="${details}">${sep}${length}</a>`;
 }
 
 function Progress(max) {
