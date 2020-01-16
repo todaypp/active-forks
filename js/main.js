@@ -118,11 +118,14 @@ function initDT() {
       };
     }),
     columnDefs: [
-      { className: 'dt-right', targets: [4, 5, 6, 7, 9, 10] }
+      { className: 'dt-right', targets: [4, 5, 6, 7, 9, 10] }, // numbers
+      { width: '120px', targets: 8 }, // date
     ],
     order: [[sortColumnIdx, 'desc']],
-    createdRow: function(row) {
+    createdRow: function(row, _, index) {
       $('[data-toggle=popover]', row).popover();
+      if (index === 0)
+        row.classList.add('original-repo');
     }
   });
 }
@@ -140,7 +143,7 @@ async function fetchAndShow(repo) {
   try {
     const maxRecords = Options.getAndSave().maxRecords;
 
-    const limiter = data => data.map(fork => ({
+    const singleLimiter = fork => ({
       full_name: fork.full_name,
       name: fork.name,
       default_branch: fork.default_branch,
@@ -152,19 +155,26 @@ async function fetchAndShow(repo) {
       owner: {
         login: fork.owner.login
       }
-    }));
+    });
+
+    const multiLimiter = data => data.map(singleLimiter);
+
+    const originalRepo = await api.fetch(`https://api.github.com/repos/${repo}`, singleLimiter);
+    originalRepo.diff_from_original = originalRepo.diff_to_original = '0';
+    const originalBranch = originalRepo.default_branch;
+    data.push(originalRepo);
 
     let page = 1;
-    while (data.length < maxRecords) {
+    while (data.length - 1 < maxRecords) {
       const url = `https://api.github.com/repos/${repo}/forks?sort=stargazers&per_page=${maxRecords}&page=${page}`;
-      const someData = await api.fetch(url, limiter);
+      const someData = await api.fetch(url, multiLimiter);
 
       if (someData.length === 0) break;
       data.push(...someData);
       ++page;
     }
 
-    await updateData(repo, data, api);
+    await updateData(repo, originalBranch, data.slice(1), api);
   } catch (error) {
     console.error(error);
   }
@@ -201,8 +211,7 @@ function getRepoFromUrl() {
   return urlRepo && decodeURIComponent(urlRepo);
 }
 
-async function updateData(repo, forks, api) {
-  const originalBranch = 'master'; // TODO
+async function updateData(repo, originalBranch, forks, api) {
 
   forks.forEach(fork => fork.diff_from_original = fork.diff_to_original = '');
 
@@ -367,7 +376,7 @@ function Api(token) {
           : error;
       showMsg(`${msg}. Additional info in console`, 'danger');
 
-      throw new Error(error);
+      throw error;
     }
   }
 
