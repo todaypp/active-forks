@@ -23,7 +23,15 @@ document.getElementById('form').addEventListener('submit', e => {
   fetchData();
 });
 
+let running = false;
+
 function fetchData() {
+  if (running) {
+    running = false;
+    return;
+  }
+  Runner.start();
+
   const repo = document.getElementById('q').value;
   const re = /[-_\w]+\/[-_.\w]+/;
 
@@ -36,8 +44,11 @@ function fetchData() {
   if (re.test(repo)) {
     (async function () {
       await fetchAndShow(repo);
+
+      Runner.stop();
     })();
   } else {
+    Runner.stop();
     showMsg(
       'Invalid GitHub repository! Format is &lt;username&gt;/&lt;repo&gt;',
       'danger'
@@ -187,6 +198,7 @@ async function updateData(repo, forks, api) {
   try {
     for (let fork of forks) {
       progress.update(index);
+      if (!running) break;
       await fetchMore(repo, originalBranch, fork, api);
       quota.update();
       ++index;
@@ -392,4 +404,17 @@ function ApiCache() {
   }
 
   return { get, add };
+}
+
+const Runner = {
+  start: function() {
+    running = true;
+    $('#find .find-label').text('Stop');
+    $('#find #spinner').addClass('d-inline-block');
+  },
+  stop: function() {
+    running = false;
+    $('#find .find-label').text('Find');
+    $('#find #spinner').removeClass('d-inline-block');
+  }
 }
