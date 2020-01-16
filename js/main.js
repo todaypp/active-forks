@@ -293,16 +293,12 @@ function Api(token) {
     reset: new Date()
   };
 
-  async function get(url) {
-    const key = url.toLowerCase();
-    try {
-      const config1 = JSON.parse(JSON.stringify(config));
-      const cachedString = localStorage.getItem(key);
-      const cached = JSON.parse(cachedString);
-      if (cached)
-        config1.headers['if-none-match'] = cached.etag;
+  const cache = ApiCache();
 
-      const response = await fetch(url, config1);
+  async function get(url, fnResponseLimiter) {
+    try {
+      const { cached, newConfig } = cache.get(url, config);
+      const response = await fetch(url, newConfig);
       if (response.status === 304)
         return cached.data;
       if (!response.ok)
@@ -313,10 +309,7 @@ function Api(token) {
       const data = await response.json();
       const limitedData = fnResponseLimiter(data);
 
-      localStorage.setItem(key, JSON.stringify({
-        etag: response.headers.get('etag'),
-        data: limitedData
-      }));
+      cache.add(url, limitedData, response);
 
       return limitedData;
 
@@ -347,4 +340,49 @@ function Api(token) {
   }
 
   return { fetch: get, getLimits, refreshLimits };
+}
+
+function ApiCache() {
+
+  const map = new Map();
+  const STORAGE = sessionStorage;
+
+  function get(url, config) {
+    const key = url.toLowerCase();
+    const newConfig = JSON.parse(JSON.stringify(config));
+
+    let cachedString = map.get(key);
+    try {
+      if (!cachedString) {
+        cachedString = STORAGE.getItem(key);
+        if (cachedString)
+          map.set(key, cachedString);
+      }
+    } catch {}
+
+    const cached = JSON.parse(cachedString);
+    if (cached) {
+      newConfig.headers['if-none-match'] = cached.etag;
+      cached.date = new Date();
+    }
+
+    return { cached, newConfig };
+  }
+
+  function add(url, limitedData, response) {
+    const key = url.toLowerCase();
+    const val = JSON.stringify({
+      etag: response.headers.get('etag'),
+      date: new Date(),
+      data: limitedData
+    });
+
+    map.set(key, val);
+    try {
+      STORAGE.setItem(key, val);
+    } catch (err) {
+    }
+  }
+
+  return { get, add };
 }
