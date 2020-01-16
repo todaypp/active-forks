@@ -135,8 +135,10 @@ async function fetchAndShow(repo) {
   localStorage.setItem('token', token);
   const api = Api(token);
 
-  let data;
+  const data = [];
   try {
+    const maxRecords = Options.getAndSave().maxRecords;
+
     const limiter = data => data.map(fork => ({
       full_name: fork.full_name,
       name: fork.name,
@@ -150,7 +152,16 @@ async function fetchAndShow(repo) {
         login: fork.owner.login
       }
     }));
-    data = await api.fetch(`https://api.github.com/repos/${repo}/forks?sort=stargazers&per_page=100`, limiter);
+
+    let page = 1;
+    while (data.length < maxRecords) {
+      const url = `https://api.github.com/repos/${repo}/forks?sort=stargazers&per_page=${maxRecords}&page=${page}`;
+      const someData = await api.fetch(url, limiter);
+
+      if (someData.length === 0) break;
+      data.push(...someData);
+      ++page;
+    }
 
     await updateData(repo, data, api);
   } catch (error) {
@@ -441,22 +452,25 @@ const Options = {
 
     try {
       const savedString = localStorage.getItem('options');
-      if (!savedString) return;
-      const saved = JSON.parse(savedString);
+      const saved = JSON.parse(savedString)
+        || { sameSize: true, samePushDate: true, maxRecords: 100 };
 
       $('#sameSize').attr('checked', saved.sameSize);
       $('#samePushDate').attr('checked', saved.samePushDate);
+      $('#maxRecords').val(saved.maxRecords);
     } catch {}
   },
 
   getAndSave: function() {
     const sameSize = $('#sameSize').is(':checked');
     const samePushDate = $('#samePushDate').is(':checked');
+    const maxRecords = $('#maxRecords').val();
 
+    const val = { sameSize, samePushDate, maxRecords };
     try {
-      localStorage.setItem('options', JSON.stringify({ sameSize, samePushDate }));
+      localStorage.setItem('options', JSON.stringify(val));
     } catch {}
-    return { sameSize, samePushDate };
+    return val;
   }
 };
 
