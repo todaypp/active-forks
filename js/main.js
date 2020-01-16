@@ -118,6 +118,9 @@ function initDT() {
             : null,
       };
     }),
+    columnDefs: [
+      { className: 'dt-right', targets: [4, 5, 6, 7, 9, 10] }
+    ],
     order: [[sortColumnIdx, 'desc']],
   });
 }
