@@ -20,6 +20,6 @@ If both are selected, both conditions have to be satisfied at the same time.
 If the condition is satisfied, commits for the second fork are not retrieved but assumed to be the same as in the first fork.
 
 
-[Find Active Fork](https://lukaszmn.github.io/active-forks/index.html)
+[Find Active Fork](https://lukasznojek.com/projects/active-github-forks/)
 
 ![Screenshot](screenshot.png "Active Forks in Action")
